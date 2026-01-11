@@ -1,70 +1,59 @@
-name: Build and Test
+name: Build Gradle Project
 
-# When the workflow should run
+# Trigger on pushes to main and all pull requests
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
 
-# Cancel previous runs of the same workflow on the same branch
+# Cancel in-progress runs when a new commit is pushed to the same branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: Build & Test
+    name: Build (no tests present)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-      # Checkout the repository code
+      # 1. Get the code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Set up JDK 17 using Amazon Corretto (AWS distribution)
-      - name: Set up JDK 17 with Amazon Corretto
+      # 2. Set up Java 17 with Amazon Corretto
+      - name: Set up JDK 17 (Amazon Corretto)
         uses: actions/setup-java@v4
         with:
-          java-version: '17'              # Major version; Corretto supports major-only spec
-          distribution: 'corretto'        # Official value for Amazon Corretto
-          cache: 'gradle'                 # Keeps caching Gradle dependencies (highly recommended)
+          java-version: '17'
+          distribution: 'corretto'      # Amazon Corretto distribution
+          cache: 'gradle'               # Cache Gradle dependencies automatically
 
-      # Setup Gradle (caches Gradle wrapper, dependencies, configuration cache...)
+      # 3. Setup Gradle (caches Gradle User Home, config cache, wrapper validation, etc.)
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5   # Latest stable version in Jan 2026
         with:
-          # Optional: use a specific Gradle version (recommended)
+          # Optional: pin to your wrapper version if you prefer explicit control
           # gradle-version: 9.2.1
-          # Optional: if you want to use configuration cache encryption
-          # cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
 
-      # Show Gradle version (useful for debugging)
-      - name: Gradle version
+      # 4. Show Gradle version (great for debugging)
+      - name: Gradle version info
         run: ./gradlew --version
 
-      # Run the main build + test command
-      # Using configuration-cache=readonly (recommended for CI since Gradle 9.1+)
-      - name: Build and test
+      # 5. Run the main build
+      #    - build: compiles + assembles JARs
+      #    - shadowJar: builds the fat/uber JAR (if enabled in build.gradle)
+      - name: Build project
         run: |
-          ./gradlew build \
+          ./gradlew build shadowJar \
             --no-daemon \
             --configuration-cache=readonly
 
-      # Optional: Upload test results (even if tests fail)
-      - name: Upload test results (always)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: |
-            **/build/test-results/**/*.xml
-            **/build/reports/tests/**/*
-          retention-days: 7
-
-      # Optional: Upload built artifacts (JARs, etc.)
+      # 6. Upload the built artifacts (JARs + fat JAR)
       - name: Upload build artifacts
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: built-artifacts
+          name: built-jars
           path: |
             build/libs/*.jar
           retention-days: 7
