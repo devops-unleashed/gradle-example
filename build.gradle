@@ -1,32 +1,64 @@
 plugins {
     id 'groovy'
     id 'application'
-    id 'com.gradleup.shadow' version '9.1.0'
+    id 'com.gradleup.shadow' version '9.3.1'   // Latest as of Jan 2026 – creates fat/uber JARs
 }
 
 repositories {
     mavenCentral()
     flatDir {
-        dirs 'lib'
+        dirs 'lib'  // For local JAR dependencies
     }
 }
 
-base.archivesName = 'gradle-example'
+base {
+    archivesName = 'gradle-example'
+}
+
+// Performance & modern Gradle best practices (recommended in 2025/2026)
+configurations.all {
+    // Optional: fail on version conflict resolution to catch issues early
+    resolutionStrategy {
+        failOnVersionConflict()
+    }
+}
 
 dependencies {
-    // Groovy BOM
+    // Use the Groovy BOM for consistent versions across Groovy modules
     implementation platform('org.apache.groovy:groovy-bom:5.+')
 
-    // Groovy module dependency
+    // Specific Groovy modules (only what you actually need)
     implementation 'org.apache.groovy:groovy-json'
 
-    // Strictly exact version of Maven dependency
+    // Strictly fixed version (using !! syntax for exact version enforcement)
     implementation 'com.codevineyard:hello-world:1.0.1!!'
 
-    // Dependency from local jar
+    // Local JAR dependency (from flatDir repository)
     implementation ':simple-jar'
 }
 
 application {
+    // Main class for the application plugin (used for 'run' task, JAR manifest, etc.)
     mainClass = 'com.adjectivecolournoun.gradle.Greetz'
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Shadow (fat JAR) configuration – creates an uber JAR with all dependencies
+// Run with: ./gradlew shadowJar
+// Output will be in build/libs/gradle-example-all.jar (or similar)
+// ──────────────────────────────────────────────────────────────────────────────
+shadowJar {
+    archiveClassifier.set('all')           // Optional: name the output e.g. *-all.jar
+    mergeServiceFiles()                    // Merge META-INF/services (common need)
+    manifest {
+        attributes 'Main-Class': application.mainClass.get()
+    }
+    // Optional: exclude signing files or unwanted META-INF entries
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+}
+
+// Optional: make the regular jar task depend on shadowJar (or replace it)
+// jar.dependsOn shadowJar
+
+// Optional: make 'assemble' produce the fat JAR by default
+// assemble.dependsOn shadowJar

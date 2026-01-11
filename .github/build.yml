@@ -1,0 +1,59 @@
+name: Build Gradle Project
+
+# Trigger on pushes to main and all pull requests
+on:
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+# Cancel in-progress runs when a new commit is pushed to the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (no tests present)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # 1. Get the code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Set up Java 17 with Amazon Corretto
+      - name: Set up JDK 17 (Amazon Corretto)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'corretto'      # Amazon Corretto distribution
+          cache: 'gradle'               # Cache Gradle dependencies automatically
+
+      # 3. Setup Gradle (caches Gradle User Home, config cache, wrapper validation, etc.)
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5   # Latest stable version in Jan 2026
+        with:
+          # Optional: pin to your wrapper version if you prefer explicit control
+          # gradle-version: 9.2.1
+
+      # 4. Show Gradle version (great for debugging)
+      - name: Gradle version info
+        run: ./gradlew --version
+
+      # 5. Run the main build
+      #    - build: compiles + assembles JARs
+      #    - shadowJar: builds the fat/uber JAR (if enabled in build.gradle)
+      - name: Build project
+        run: |
+          ./gradlew build shadowJar \
+            --no-daemon \
+            --configuration-cache=readonly
+
+      # 6. Upload the built artifacts (JARs + fat JAR)
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-jars
+          path: |
+            build/libs/*.jar
+          retention-days: 7
