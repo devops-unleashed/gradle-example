@@ -5,7 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:  # Allows manual trigger from GitHub UI
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -18,11 +18,9 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      # 1. Get the code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Set up Java 17 with Amazon Corretto
       - name: Set up JDK 17 (Amazon Corretto)
         uses: actions/setup-java@v4
         with:
@@ -30,22 +28,18 @@ jobs:
           distribution: 'corretto'
           cache: 'gradle'
 
-      # 3. Setup Gradle (caches Gradle User Home, config cache, etc.)
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5  # Latest stable in Jan 2026
+        uses: gradle/actions/setup-gradle@v5.0.0  # Exact latest stable version (Jan 2026)
 
-      # 4. Show Gradle version info
       - name: Gradle version info
         run: ./gradlew --version
 
-      # 5. Run the main build (build + shadowJar for your fat JAR)
       - name: Build project
         run: |
           ./gradlew build shadowJar \
             --no-daemon \
             --configuration-cache=readonly
 
-      # 6. Upload built JARs (regular + fat/all JAR)
       - name: Upload build artifacts
         if: success()
         uses: actions/upload-artifact@v4
