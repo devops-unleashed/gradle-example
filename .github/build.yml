@@ -1,0 +1,70 @@
+name: Build and Test
+
+# When the workflow should run
+on:
+  workflow_dispatch:
+
+# Cancel previous runs of the same workflow on the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repository code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up JDK 17 using Amazon Corretto (AWS distribution)
+      - name: Set up JDK 17 with Amazon Corretto
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'              # Major version; Corretto supports major-only spec
+          distribution: 'corretto'        # Official value for Amazon Corretto
+          cache: 'gradle'                 # Keeps caching Gradle dependencies (highly recommended)
+
+      # Setup Gradle (caches Gradle wrapper, dependencies, configuration cache...)
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # Optional: use a specific Gradle version (recommended)
+          # gradle-version: 9.2.1
+          # Optional: if you want to use configuration cache encryption
+          # cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+
+      # Show Gradle version (useful for debugging)
+      - name: Gradle version
+        run: ./gradlew --version
+
+      # Run the main build + test command
+      # Using configuration-cache=readonly (recommended for CI since Gradle 9.1+)
+      - name: Build and test
+        run: |
+          ./gradlew build \
+            --no-daemon \
+            --configuration-cache=readonly
+
+      # Optional: Upload test results (even if tests fail)
+      - name: Upload test results (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            **/build/test-results/**/*.xml
+            **/build/reports/tests/**/*
+          retention-days: 7
+
+      # Optional: Upload built artifacts (JARs, etc.)
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-artifacts
+          path: |
+            build/libs/*.jar
+          retention-days: 7
